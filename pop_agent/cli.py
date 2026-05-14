@@ -8,11 +8,13 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import load_settings
+from .daemon import DEFAULT_HOST, DEFAULT_PORT, install_api_daemon
 from .dependencies import format_dependency_report, install_project_dependencies
 from .memory import MemoryStore, MemoryUpdate
 from .models import GenerationRequest
 from .orchestrator import GenerationService
 from .storage import read_json
+from .user_config import provider_config, save_user_config
 
 app = typer.Typer(help="Multi-agent popular science generation")
 memory_app = typer.Typer(help="User cognitive memory commands")
@@ -20,6 +22,10 @@ run_app = typer.Typer(help="Run inspection commands")
 app.add_typer(memory_app, name="memory")
 app.add_typer(run_app, name="run")
 console = Console()
+
+
+def main() -> None:
+    app()
 
 
 @app.command()
@@ -58,6 +64,71 @@ def install_deps(
     if result.returncode != 0:
         raise typer.Exit(result.returncode)
     console.print("[bold green]Dependencies installed.[/bold green]")
+
+
+@app.command("onboard")
+def onboard(
+    install_daemon_option: bool = typer.Option(
+        False,
+        "--install-daemon",
+        help="Install a local API daemon after writing the initial config.",
+    ),
+    provider: str = typer.Option(
+        "mock",
+        "--provider",
+        help="Provider preset: mock, deepseek, or openai.",
+    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="API key for real providers."),
+    base_url: str | None = typer.Option(None, "--base-url", help="Override provider base URL."),
+    model: str | None = typer.Option(None, "--model", help="Override provider model."),
+    data_dir: Path = typer.Option(Path("data"), "--data-dir", help="Data directory."),
+    host: str = typer.Option(DEFAULT_HOST, "--host", help="Daemon bind host."),
+    port: int = typer.Option(DEFAULT_PORT, "--port", help="Daemon bind port."),
+    start_daemon: bool = typer.Option(
+        True,
+        "--start-daemon/--no-start-daemon",
+        help="Start daemon immediately when systemd user service is available.",
+    ),
+) -> None:
+    """Run source-install onboarding and optionally install the local API daemon."""
+    normalized_provider = provider.lower()
+    if normalized_provider not in {"mock", "deepseek", "openai"}:
+        raise typer.BadParameter("provider must be one of: mock, deepseek, openai")
+    if normalized_provider != "mock" and not api_key:
+        raise typer.BadParameter("--api-key is required for real providers")
+
+    config = provider_config(
+        normalized_provider,
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        data_dir=str(data_dir),
+    )
+    path = save_user_config(config)
+    console.print(f"[bold green]Config saved[/bold green]: {path}")
+    console.print(format_dependency_report(include_dev=False))
+
+    if install_daemon_option:
+        result = install_api_daemon(
+            host=host,
+            port=port,
+            data_dir=data_dir,
+            start=start_daemon,
+        )
+        console.print(result.message)
+    else:
+        console.print("Next: run [bold]pop-agent tui[/bold] or [bold]pop-agent generate --topic ...[/bold]")
+
+
+@app.command("daemon")
+def daemon(
+    host: str = typer.Option(DEFAULT_HOST, "--host", help="Bind host."),
+    port: int = typer.Option(DEFAULT_PORT, "--port", help="Bind port."),
+) -> None:
+    """Run the local FastAPI daemon in the foreground."""
+    import uvicorn
+
+    uvicorn.run("pop_agent.api:app", host=host, port=port)
 
 
 @app.command()
@@ -157,3 +228,7 @@ def run_show(
         raise typer.BadParameter(f"Run not found: {run_id}")
     data = read_json(path)
     console.print_json(data=data)
+
+
+if __name__ == "__main__":
+    main()

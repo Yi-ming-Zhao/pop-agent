@@ -1,0 +1,25 @@
+{
+  "name": "pop-agent",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Multi-agent popular science generation CLI and TUI",
+  "type": "module",
+  "bin": {
+    "pop-agent": "./bin/pop-agent.mjs",
+    "pop-agent-bootstrap": "./bin/pop-agent-bootstrap.mjs"
+  },
+  "scripts": {
+    "postinstall": "python3 bootstrap.py install",
+    "install:python": "python3 bootstrap.py install",
+    "build": "python3 bootstrap.py build",
+    "ui:build": "python3 bootstrap.py ui-build",
+    "doctor": "python3 bootstrap.py doctor",
+    "onboard": "python3 -m pop_agent onboard",
+    "tui": "python3 -m pop_agent tui",
+    "test": "pytest"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=18"
+  }
+}

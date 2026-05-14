@@ -69,6 +69,25 @@
 ### 需求: 依赖诊断和自动安装命令
 系统必须提供命令行依赖诊断和自动安装入口，使用户在 TUI 依赖缺失时仍可修复环境。
 
+#### 场景: Clone 后 Bootstrap
+- **当** 用户刚 clone 仓库且 `pop-agent` 命令尚未安装
+- **那么** 系统必须提供不依赖第三方包的 bootstrap 入口，用于检查环境和安装项目依赖
+
+#### 场景: Source Install 流程
+- **当** 用户运行 `python3 bootstrap.py install && python3 bootstrap.py build && python3 bootstrap.py ui-build`
+- **并且** 用户运行 `python3 bootstrap.py link`
+- **那么** 系统必须安装依赖、验证 Python/TUI 构建，并把当前 checkout 作为可执行命令链接到当前 Python 环境
+
+#### 场景: PNPM Source Install 流程
+- **当** 用户运行 `pnpm install && pnpm build && pnpm ui:build`
+- **并且** 用户运行 `pnpm link --global`
+- **那么** 系统必须通过 pnpm scripts 安装 Python 依赖、验证构建，并暴露可转发到 Python CLI 的 `pop-agent` 命令
+
+#### 场景: Onboard 安装 daemon
+- **当** 用户运行 `pop-agent onboard --install-daemon`
+- **那么** 系统必须写入初始用户配置
+- **并且** 安装本机 FastAPI daemon 的 systemd user service 或 fallback 启动脚本
+
 #### 场景: 诊断依赖
 - **当** 用户运行 `pop-agent doctor`
 - **那么** 系统必须列出运行依赖是否已安装

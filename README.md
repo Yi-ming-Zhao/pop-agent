@@ -14,6 +14,61 @@
 - **真实模型兼容层**：OpenAI-compatible 后端支持超时、重试、DeepSeek thinking 参数和宽松 JSON 归一化。
 - **全屏 TUI 前端**：提供零基础可用的终端界面、安装向导、生成表单、记忆管理、运行记录和 slash commands。
 
+## 从零开始试用
+
+刚 clone 下来时，`pop-agent` 命令还没有被安装到当前环境里，所以不能直接运行 `pop-agent doctor`。第一次应在仓库根目录运行：
+
+```bash
+python3 bootstrap.py doctor
+python3 bootstrap.py install-deps
+```
+
+如果想使用类似 OpenClaw 的 source install 流程，可以运行：
+
+```bash
+git clone https://github.com/Yi-ming-Zhao/pop-agent.git
+cd pop-agent
+python3 bootstrap.py install && python3 bootstrap.py build && python3 bootstrap.py ui-build
+python3 bootstrap.py link
+pop-agent onboard --install-daemon
+```
+
+如果你更习惯 pnpm，也可以使用同样风格的命令：
+
+```bash
+git clone https://github.com/Yi-ming-Zhao/pop-agent.git
+cd pop-agent
+pnpm install && pnpm build && pnpm ui:build
+pnpm link --global
+pop-agent onboard --install-daemon
+```
+
+`pnpm install` 会通过 `postinstall` 调用 `python3 bootstrap.py install` 安装 Python 依赖；`pnpm link --global` 暴露的是一个 Node wrapper，它会转发到 `python3 -m pop_agent`。
+
+这里的 `onboard --install-daemon` 会保存默认 Mock 配置，并安装本机 FastAPI daemon。支持 systemd user service 的环境会写入 `~/.config/systemd/user/pop-agent-api.service` 并尝试启动；否则会生成 `~/.config/pop-agent/daemon/start-api.sh` 启动脚本。
+
+安装完成后再运行：
+
+```bash
+pop-agent doctor
+pop-agent tui
+```
+
+如果 `pop-agent` 没有出现在 PATH，也可以使用模块入口：
+
+```bash
+python3 -m pop_agent doctor
+python3 -m pop_agent tui
+```
+
+想一步进入演示界面，可以运行：
+
+```bash
+python3 bootstrap.py tui
+```
+
+它会在缺依赖时先安装依赖，再启动 TUI。
+
 ## 安装
 
 ```bash
@@ -38,14 +93,14 @@ python3 -m pip install -e ".[dev]"
 - `pytest>=8.2`
 - `pytest-asyncio>=0.23`
 
-如果已经拿到源码但依赖不完整，可以先运行：
+如果已经安装过 `pop-agent`，但依赖不完整，可以运行：
 
 ```bash
 pop-agent doctor
 pop-agent install-deps
 ```
 
-TUI 的安装向导里也提供“检查依赖”和“安装/修复依赖”按钮。不过如果 `textual` 完全没安装，TUI 本身无法启动，这时应先使用上面的 `pop-agent install-deps`。
+TUI 的安装向导里也提供“检查依赖”和“安装/修复依赖”按钮。不过如果 `textual` 完全没安装，TUI 本身无法启动，这时应先使用 `python3 bootstrap.py install-deps`。
 
 首次使用推荐直接启动全屏 TUI，并在安装向导里选择 DeepSeek、OpenAI-compatible 或 Mock：
 
