@@ -72,6 +72,7 @@ class StudentAgent:
             ),
         )
         data = parse_json_object(text, heuristic_student_feedback(draft, topic))
+        data = normalize_student_feedback(data)
         return StudentFeedback(**data)
 
 
@@ -89,6 +90,7 @@ class AggregatorAgent:
         )
         fallback = aggregate_feedbacks(feedbacks).model_dump(mode="json")
         data = parse_json_object(text, fallback)
+        data = normalize_aggregated_feedback(data)
         return AggregatedFeedback(**data)
 
 
@@ -108,6 +110,7 @@ class FactCheckerAgent:
             text,
             {"blocking_issues": [], "warnings": [], "summary": "未发现阻断问题。"},
         )
+        data = normalize_fact_check(data)
         return FactCheckReport(**data)
 
 
@@ -178,6 +181,79 @@ def aggregate_feedbacks(feedbacks: list[StudentFeedback]) -> AggregatedFeedback:
         nice_to_have=nice,
         summary=f"共发现 {len(all_issues)} 个问题，其中 {len(must_fix)} 个需要优先修复。",
     )
+
+
+def normalize_student_feedback(data: dict) -> dict:
+    normalized = dict(data)
+    normalized["confusion_points"] = normalize_issue_list(
+        normalized.get("confusion_points", [])
+    )
+    if normalized.get("recommendation") not in {"continue", "stop"}:
+        high_impact = [
+            issue for issue in normalized["confusion_points"] if issue["impact"] >= 7
+        ]
+        score = int(normalized.get("comprehension_score", 1) or 1)
+        normalized["recommendation"] = "continue" if high_impact or score < 8 else "stop"
+    return normalized
+
+
+def normalize_aggregated_feedback(data: dict) -> dict:
+    normalized = dict(data)
+    for key in ["common_issues", "must_fix", "nice_to_have"]:
+        normalized[key] = normalize_issue_list(normalized.get(key, []))
+    return normalized
+
+
+def normalize_fact_check(data: dict) -> dict:
+    normalized = dict(data)
+    normalized["blocking_issues"] = normalize_issue_list(
+        normalized.get("blocking_issues", [])
+    )
+    normalized["warnings"] = normalize_issue_list(normalized.get("warnings", []))
+    return normalized
+
+
+def normalize_issue_list(raw_items: object) -> list[dict]:
+    if not isinstance(raw_items, list):
+        return []
+    issues = []
+    for index, item in enumerate(raw_items, start=1):
+        if isinstance(item, dict):
+            issue = str(
+                item.get("issue")
+                or item.get("title")
+                or item.get("question")
+                or item.get("point")
+                or item.get("summary")
+                or f"困惑点 {index}"
+            )
+            impact = coerce_impact(item.get("impact", item.get("severity", 7)))
+            evidence = str(item.get("evidence") or item.get("reason") or issue)
+            suggestion = str(
+                item.get("suggestion") or item.get("fix") or item.get("advice") or "补充解释并给出具体例子。"
+            )
+        else:
+            issue = str(item)
+            impact = 7
+            evidence = issue
+            suggestion = "补充一步解释，避免读者在这里中断理解。"
+        issues.append(
+            {
+                "issue": issue,
+                "impact": impact,
+                "evidence": evidence,
+                "suggestion": suggestion,
+            }
+        )
+    return issues
+
+
+def coerce_impact(value: object) -> int:
+    try:
+        impact = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        impact = 7
+    return max(1, min(10, impact))
 
 
 def derive_memory_updates(

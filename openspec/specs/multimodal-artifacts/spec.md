@@ -1,7 +1,7 @@
 # multimodal-artifacts 规范
 
 ## 目的
-待定 - 由归档变更 add-popsci-multi-agent-cli 创建。归档后请更新目的。
+定义生成结果的统一 artifact 协议，使文字版本和未来图片、视频版本共享同一运行状态与 API 响应结构。
 ## 需求
 ### 需求:统一 Artifact 协议
 系统必须使用统一 artifact 结构描述生成结果，支持 text、image、video 模态。
@@ -16,4 +16,3 @@
 #### 场景:未来添加图片
 - **当** 后续版本新增图片生成 Agent
 - **那么** 系统必须能通过新增 image artifact 扩展而不改变 run 基础结构
-

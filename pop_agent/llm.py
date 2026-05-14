@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from typing import Any
@@ -41,15 +42,34 @@ class OpenAICompatibleLLM(LLMClient):
                 {"role": "user", "content": user},
             ],
             "temperature": temperature,
+            "stream": False,
         }
+        if "deepseek" in self.settings.base_url:
+            payload["thinking"] = {"type": self.settings.deepseek_thinking}
         headers = {"Authorization": f"Bearer {self.settings.api_key}"}
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(
-                f"{self.settings.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
+        last_error: Exception | None = None
+        timeout = httpx.Timeout(self.settings.request_timeout)
+        limits = httpx.Limits(max_keepalive_connections=0)
+        for attempt in range(1, self.settings.max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
+                    response = await client.post(
+                        f"{self.settings.base_url}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                    )
+                    response.raise_for_status()
+                break
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                last_error = exc
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
+                    raise
+                if attempt >= self.settings.max_retries:
+                    raise
+                await asyncio.sleep(min(2**attempt, 8))
+        else:
+            assert last_error is not None
+            raise last_error
         data = response.json()
         return data["choices"][0]["message"]["content"]
 

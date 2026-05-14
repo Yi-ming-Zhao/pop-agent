@@ -27,3 +27,14 @@
 #### 场景:生成运行目录
 - **当** 一次生成任务启动
 - **那么** 系统必须创建包含 state.json、drafts、feedback、final 和 report 的运行记录
+
+### 需求:真实模型输出归一化
+系统必须在 Agent 边界归一化真实模型返回的宽松 JSON，使学生反馈、聚合反馈和事实检查结果满足内部结构化模型。
+
+#### 场景:困惑点以字符串返回
+- **当** 学生 Agent、聚合 Agent 或事实检查 Agent 返回字符串形式的困惑点或缺少 issue/evidence/suggestion 字段
+- **那么** 系统必须将其转换为包含 issue、impact、evidence 和 suggestion 的结构化条目
+
+#### 场景:推荐值不符合枚举
+- **当** 学生 Agent 返回的 recommendation 不是 continue 或 stop
+- **那么** 系统必须根据理解评分和高影响困惑推导合法 recommendation

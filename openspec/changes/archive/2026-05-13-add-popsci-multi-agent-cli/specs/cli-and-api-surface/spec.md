@@ -27,3 +27,14 @@
 #### 场景:无 API key 测试
 - **当** 测试配置使用 mock 后端
 - **那么** 系统必须在不访问网络的情况下完成完整生成流程
+
+### 需求:OpenAI-compatible 后端配置
+系统必须支持通过环境变量配置 OpenAI-compatible 服务，包括 API key、base URL、模型名、请求超时、重试次数和供应商特定参数。
+
+#### 场景:调用 DeepSeek
+- **当** 用户配置 POP_AGENT_BASE_URL 为 https://api.deepseek.com 且 POP_AGENT_MODEL 为 deepseek-v4-pro
+- **那么** 系统必须按 /chat/completions 发送非流式请求，并允许通过 POP_AGENT_DEEPSEEK_THINKING 控制 thinking 参数
+
+#### 场景:临时网络失败
+- **当** OpenAI-compatible 请求遇到传输错误或 5xx 响应
+- **那么** 系统必须按配置的重试次数进行重试，且不得重试 4xx 客户端错误

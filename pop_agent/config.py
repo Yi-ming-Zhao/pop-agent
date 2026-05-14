@@ -6,6 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .user_config import load_user_config
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -16,6 +18,9 @@ class Settings:
     model: str
     max_iterations: int
     clarity_threshold: int
+    request_timeout: float
+    max_retries: int
+    deepseek_thinking: str
 
 
 def load_settings(
@@ -26,18 +31,47 @@ def load_settings(
     max_iterations: int | None = None,
 ) -> Settings:
     load_dotenv()
+    user_config = load_user_config()
+    env = os.getenv
+
+    def configured(
+        env_name: str,
+        config_attr: str,
+        default: str | None = None,
+    ) -> str | None:
+        value = env(env_name)
+        if value not in (None, ""):
+            return value
+        config_value = getattr(user_config, config_attr)
+        if config_value not in (None, ""):
+            return str(config_value)
+        return default
+
     resolved_data_dir = Path(
-        data_dir or os.getenv("POP_AGENT_DATA_DIR", "data")
+        data_dir or configured("POP_AGENT_DATA_DIR", "data_dir", "data") or "data"
     ).expanduser()
     return Settings(
         data_dir=resolved_data_dir,
-        llm_backend=llm_backend or os.getenv("POP_AGENT_LLM_BACKEND", "mock"),
-        api_key=os.getenv("POP_AGENT_API_KEY"),
-        base_url=os.getenv(
-            "POP_AGENT_BASE_URL", "https://api.openai.com/v1"
+        llm_backend=llm_backend
+        or configured("POP_AGENT_LLM_BACKEND", "llm_backend", "mock")
+        or "mock",
+        api_key=configured("POP_AGENT_API_KEY", "api_key"),
+        base_url=(
+            configured("POP_AGENT_BASE_URL", "base_url", "https://api.openai.com/v1")
+            or "https://api.openai.com/v1"
         ).rstrip("/"),
-        model=model or os.getenv("POP_AGENT_MODEL", "gpt-4o-mini"),
+        model=model
+        or configured("POP_AGENT_MODEL", "model", "gpt-4o-mini")
+        or "gpt-4o-mini",
         max_iterations=max_iterations
-        or int(os.getenv("POP_AGENT_MAX_ITERATIONS", "3")),
+        or int(configured("POP_AGENT_MAX_ITERATIONS", "max_iterations", "3") or "3"),
         clarity_threshold=int(os.getenv("POP_AGENT_CLARITY_THRESHOLD", "8")),
+        request_timeout=float(
+            configured("POP_AGENT_REQUEST_TIMEOUT", "request_timeout", "120") or "120"
+        ),
+        max_retries=int(configured("POP_AGENT_MAX_RETRIES", "max_retries", "3") or "3"),
+        deepseek_thinking=configured(
+            "POP_AGENT_DEEPSEEK_THINKING", "deepseek_thinking", "disabled"
+        )
+        or "disabled",
     )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+import inspect
 from pathlib import Path
 
 from .agents import (
@@ -27,7 +29,11 @@ class GenerationService:
         self.settings = settings or load_settings()
         self.memory = MemoryStore(self.settings.data_dir)
 
-    async def generate(self, request: GenerationRequest) -> GenerationResult:
+    async def generate(
+        self,
+        request: GenerationRequest,
+        progress: ProgressCallback | None = None,
+    ) -> GenerationResult:
         settings = self._settings_for_request(request)
         llm = make_llm(settings)
         teacher = TeacherAgent(llm)
@@ -37,7 +43,9 @@ class GenerationService:
         editor = EditorAgent(llm)
 
         paths = create_run_paths(settings.data_dir)
+        await emit_progress(progress, "run", f"创建运行目录 {paths.run_id}")
         write_json(paths.run_dir / "input.json", request)
+        await emit_progress(progress, "memory", "读取用户认知记忆并构建学生 Agent 上下文")
         memory_context = self._memory_context(request.user_id, request.topic)
 
         iterations: list[IterationState] = []
@@ -47,6 +55,7 @@ class GenerationService:
         max_iterations = request.max_iterations or settings.max_iterations
 
         for iteration in range(1, max_iterations + 1):
+            await emit_progress(progress, "teacher", f"第 {iteration} 轮：教师 Agent 生成/修订草稿")
             draft = await teacher.draft(
                 topic=request.topic,
                 audience=request.audience,
@@ -58,6 +67,7 @@ class GenerationService:
             draft_path = paths.drafts_dir / f"iter-{iteration}-teacher.md"
             write_text(draft_path, render_article(draft.title, draft.synopsis, draft.content))
 
+            await emit_progress(progress, "student", f"第 {iteration} 轮：学生 Agent 根据用户记忆评估可懂度")
             feedback = await student.evaluate(
                 draft=draft,
                 topic=request.topic,
@@ -68,6 +78,7 @@ class GenerationService:
             feedback_path = paths.feedback_dir / f"iter-{iteration}-student.json"
             write_json(feedback_path, feedback)
 
+            await emit_progress(progress, "aggregate", f"第 {iteration} 轮：聚合反馈并判断是否继续迭代")
             aggregate = await aggregator.aggregate([feedback])
             aggregate_path = paths.feedback_dir / f"iter-{iteration}-aggregate.json"
             write_json(aggregate_path, aggregate)
@@ -84,11 +95,14 @@ class GenerationService:
                 )
             )
             if feedback.comprehension_score >= settings.clarity_threshold and high_impact == 0:
+                await emit_progress(progress, "stop", "已达到清晰度阈值，停止迭代")
                 break
 
         assert draft is not None
+        await emit_progress(progress, "fact_check", "事实检查 Agent 检查阻断问题和风险提示")
         fact_check = await fact_checker.check(draft, request.topic)
         if fact_check.blocking_issues:
+            await emit_progress(progress, "teacher", "事实检查发现阻断问题，教师 Agent 重新修订")
             draft = await teacher.draft(
                 topic=request.topic,
                 audience=request.audience,
@@ -97,6 +111,7 @@ class GenerationService:
                 source_text=request.source_text,
                 feedback=aggregate,
             )
+        await emit_progress(progress, "editor", "编辑 Agent 润色最终稿")
         final_article = await editor.edit(draft, fact_check)
         final_path = paths.final_dir / "article.md"
         write_text(
@@ -110,6 +125,7 @@ class GenerationService:
 
         memory_updates = []
         if last_feedback:
+            await emit_progress(progress, "memory", "根据学生反馈更新用户认知记忆")
             updates = derive_memory_updates(
                 user_id=request.user_id,
                 topic=request.topic,
@@ -139,6 +155,7 @@ class GenerationService:
         )
         write_json(paths.run_dir / "state.json", result)
         write_text(paths.run_dir / "report.md", render_report(result))
+        await emit_progress(progress, "done", f"生成完成：{final_path}")
         return result
 
     def _settings_for_request(self, request: GenerationRequest) -> Settings:
@@ -162,6 +179,21 @@ class GenerationService:
 
 def render_article(title: str, synopsis: str, content: str) -> str:
     return f"# {title}\n\n> {synopsis}\n\n{content}\n"
+
+
+ProgressCallback = Callable[[str, str], None | Awaitable[None]]
+
+
+async def emit_progress(
+    callback: ProgressCallback | None,
+    stage: str,
+    message: str,
+) -> None:
+    if callback is None:
+        return
+    result = callback(stage, message)
+    if inspect.isawaitable(result):
+        await result
 
 
 def render_report(result: GenerationResult) -> str:

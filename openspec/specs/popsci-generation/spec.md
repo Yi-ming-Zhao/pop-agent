@@ -1,7 +1,7 @@
 # popsci-generation 规范
 
 ## 目的
-待定 - 由归档变更 add-popsci-multi-agent-cli 创建。归档后请更新目的。
+定义科普文章生成的多 Agent 流水线、迭代停止条件、真实模型输出兼容策略和运行记录要求。
 ## 需求
 ### 需求:多 Agent 文字科普生成
 系统必须使用教师、学生、反馈聚合、事实检查和编辑 Agent 组成的流水线生成文字科普文章。
@@ -31,3 +31,13 @@
 - **当** 一次生成任务启动
 - **那么** 系统必须创建包含 state.json、drafts、feedback、final 和 report 的运行记录
 
+### 需求:真实模型输出归一化
+系统必须在 Agent 边界归一化真实模型返回的宽松 JSON，使学生反馈、聚合反馈和事实检查结果满足内部结构化模型。
+
+#### 场景:困惑点以字符串返回
+- **当** 学生 Agent、聚合 Agent 或事实检查 Agent 返回字符串形式的困惑点或缺少 issue/evidence/suggestion 字段
+- **那么** 系统必须将其转换为包含 issue、impact、evidence 和 suggestion 的结构化条目
+
+#### 场景:推荐值不符合枚举
+- **当** 学生 Agent 返回的 recommendation 不是 continue 或 stop
+- **那么** 系统必须根据理解评分和高影响困惑推导合法 recommendation

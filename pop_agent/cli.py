@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import load_settings
+from .dependencies import format_dependency_report, install_project_dependencies
 from .memory import MemoryStore, MemoryUpdate
 from .models import GenerationRequest
 from .orchestrator import GenerationService
@@ -19,6 +20,44 @@ run_app = typer.Typer(help="Run inspection commands")
 app.add_typer(memory_app, name="memory")
 app.add_typer(run_app, name="run")
 console = Console()
+
+
+@app.command()
+def tui() -> None:
+    """Start the full-screen terminal UI."""
+    try:
+        from .tui.app import run_tui
+    except ModuleNotFoundError as exc:
+        if exc.name == "textual":
+            console.print("[red]Textual 未安装，无法启动全屏 TUI。[/red]")
+            console.print("请先运行：pop-agent install-deps")
+            raise typer.Exit(1) from exc
+        raise
+    run_tui()
+
+
+@app.command("doctor")
+def doctor(
+    include_dev: bool = typer.Option(False, "--dev", help="Include test/development dependencies"),
+) -> None:
+    """Check local runtime dependencies."""
+    console.print(format_dependency_report(include_dev=include_dev))
+
+
+@app.command("install-deps")
+def install_deps(
+    include_dev: bool = typer.Option(True, "--dev/--no-dev", help="Install development dependencies too"),
+) -> None:
+    """Install or repair project dependencies with pip."""
+    console.print("Installing dependencies...")
+    result = install_project_dependencies(include_dev=include_dev)
+    if result.stdout:
+        console.print(result.stdout)
+    if result.stderr:
+        console.print(result.stderr)
+    if result.returncode != 0:
+        raise typer.Exit(result.returncode)
+    console.print("[bold green]Dependencies installed.[/bold green]")
 
 
 @app.command()

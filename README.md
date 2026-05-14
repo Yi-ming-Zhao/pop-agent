@@ -11,6 +11,8 @@
 - **编辑 Agent**：在不改变事实含义的前提下润色最终稿。
 - **Markdown 记忆系统**：保存用户认知能力、知识掌握、误解和表达偏好，并构建 JSON 搜索索引。
 - **多模态 artifact 协议**：v1 只生成文字，输出结构已预留 `text | image | video`。
+- **真实模型兼容层**：OpenAI-compatible 后端支持超时、重试、DeepSeek thinking 参数和宽松 JSON 归一化。
+- **全屏 TUI 前端**：提供零基础可用的终端界面、安装向导、生成表单、记忆管理、运行记录和 slash commands。
 
 ## 安装
 
@@ -20,6 +22,40 @@ python3 -m pip install -e ".[dev]"
 
 默认使用 mock LLM 后端，可以不配置 API key 直接运行。
 
+运行依赖：
+
+- `fastapi>=0.115`
+- `httpx>=0.27`
+- `pydantic>=2.7`
+- `python-dotenv>=1.0`
+- `rich>=13.7`
+- `textual>=0.89`
+- `typer>=0.12`
+- `uvicorn>=0.30`
+
+开发/测试依赖：
+
+- `pytest>=8.2`
+- `pytest-asyncio>=0.23`
+
+如果已经拿到源码但依赖不完整，可以先运行：
+
+```bash
+pop-agent doctor
+pop-agent install-deps
+```
+
+TUI 的安装向导里也提供“检查依赖”和“安装/修复依赖”按钮。不过如果 `textual` 完全没安装，TUI 本身无法启动，这时应先使用上面的 `pop-agent install-deps`。
+
+首次使用推荐直接启动全屏 TUI，并在安装向导里选择 DeepSeek、OpenAI-compatible 或 Mock：
+
+```bash
+pop-agent tui
+```
+
+安装向导会把用户级配置保存到 `$POP_AGENT_CONFIG_DIR/config.json`、`$XDG_CONFIG_HOME/pop-agent/config.json` 或 `~/.config/pop-agent/config.json`。配置目录权限为 `0700`，配置文件权限为 `0600`，界面和 `/settings` 只展示脱敏后的 API key。
+如果连接测试提示 TLS/SSL EOF 或超时，通常是代理端口、代理规则或直连网络问题；可以先点击“保存当前配置”，修好代理后再生成。
+
 如需使用 OpenAI-compatible 后端：
 
 ```bash
@@ -27,9 +63,51 @@ export POP_AGENT_LLM_BACKEND=openai-compatible
 export POP_AGENT_API_KEY=your-key
 export POP_AGENT_BASE_URL=https://api.openai.com/v1
 export POP_AGENT_MODEL=gpt-4o-mini
+export POP_AGENT_REQUEST_TIMEOUT=120
+export POP_AGENT_MAX_RETRIES=3
 ```
 
+DeepSeek 示例：
+
+```bash
+export POP_AGENT_LLM_BACKEND=openai-compatible
+export POP_AGENT_API_KEY=your-deepseek-key
+export POP_AGENT_BASE_URL=https://api.deepseek.com
+export POP_AGENT_MODEL=deepseek-v4-pro
+export POP_AGENT_DEEPSEEK_THINKING=disabled
+```
+
+如果本机使用 `mihomo`/Clash 一类代理，注意 `api.deepseek.com` 可能被 GeoIP 规则判定为直连。直连超时时，需要在代理规则中让 `api.deepseek.com` 走可用代理节点。
+
 ## CLI 使用
+
+启动全屏 TUI：
+
+```bash
+pop-agent tui
+```
+
+TUI 面向零基础用户，包含：
+
+- 生成页：填写主题、目标读者、用户 ID 后点击生成。
+- 记忆页：查看、搜索、手动添加用户认知记忆。
+- 运行页：输入 run ID 查看历史状态。
+- 设置页：查看脱敏配置并重新打开安装向导。
+- 底部命令栏：支持 slash commands。
+
+TUI 内可用 slash commands：
+
+```text
+/help
+/generate --topic "黑洞为什么不是洞" --audience "初中生" --user-id student-001 --backend mock
+/memory show --user-id student-001
+/memory search "黑洞 事件视界" --user-id student-001
+/memory update --user-id student-001 --title "黑洞基础" --summary "用户知道黑洞和强引力有关" --tags "黑洞,引力"
+/run show run_20260513T000000Z_abcd1234
+/settings
+/install
+/exit
+```
 
 生成文章：
 
@@ -131,6 +209,8 @@ data/
 
 系统会自动更新记忆，并维护 JSON 索引用于学生 Agent 初始化时检索相关认知状态。
 
+真实模型可能返回语义正确但形状不完全严格的 JSON，例如把 `confusion_points` 写成字符串列表。系统会在 Agent 边界将其归一化为包含 `issue`、`impact`、`evidence`、`suggestion` 的结构化反馈，再进入聚合、事实检查和记忆更新。
+
 ## 多模态扩展
 
 生成结果统一放在 `artifacts` 中：
@@ -150,15 +230,21 @@ data/
 
 ```bash
 pytest
-openspec-cn validate add-popsci-multi-agent-cli
+openspec-cn validate --specs
 ```
 
 ## OpenSpec
 
-本实现对应变更：
+本实现对应已归档变更：
 
 ```text
-openspec/changes/add-popsci-multi-agent-cli/
+openspec/changes/archive/2026-05-13-add-popsci-multi-agent-cli/
 ```
 
-其中包含 proposal、design、specs 和 tasks。
+正式规范位于：
+
+```text
+openspec/specs/
+```
+
+其中包含 CLI/API、科普生成、用户认知记忆和多模态 artifact 协议。归档后的 DeepSeek 真实运行补充已同步到归档 change spec 和主 spec。
