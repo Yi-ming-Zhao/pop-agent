@@ -85,9 +85,12 @@ def user_config_path() -> Path:
 
 def load_user_config(path: Path | None = None) -> UserConfig:
     resolved = path or user_config_path()
-    if not resolved.exists():
+    try:
+        if not resolved.exists():
+            return UserConfig()
+        data = json.loads(resolved.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         return UserConfig()
-    data = json.loads(resolved.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         return UserConfig()
     allowed = set(UserConfig.__dataclass_fields__)

@@ -35,13 +35,15 @@ def load_settings(
     env = os.getenv
 
     def configured(
-        env_name: str,
+        env_names: str | tuple[str, ...],
         config_attr: str,
         default: str | None = None,
     ) -> str | None:
-        value = env(env_name)
-        if value not in (None, ""):
-            return value
+        names = (env_names,) if isinstance(env_names, str) else env_names
+        for env_name in names:
+            value = env(env_name)
+            if value not in (None, ""):
+                return value
         config_value = getattr(user_config, config_attr)
         if config_value not in (None, ""):
             return str(config_value)
@@ -55,13 +57,17 @@ def load_settings(
         llm_backend=llm_backend
         or configured("POP_AGENT_LLM_BACKEND", "llm_backend", "mock")
         or "mock",
-        api_key=configured("POP_AGENT_API_KEY", "api_key"),
+        api_key=configured(("POP_AGENT_API_KEY", "OPENAI_API_KEY"), "api_key"),
         base_url=(
-            configured("POP_AGENT_BASE_URL", "base_url", "https://api.openai.com/v1")
+            configured(
+                ("POP_AGENT_BASE_URL", "OPENAI_BASE_URL"),
+                "base_url",
+                "https://api.openai.com/v1",
+            )
             or "https://api.openai.com/v1"
         ).rstrip("/"),
         model=model
-        or configured("POP_AGENT_MODEL", "model", "gpt-4o-mini")
+        or configured(("POP_AGENT_MODEL", "OPENAI_MODEL"), "model", "gpt-4o-mini")
         or "gpt-4o-mini",
         max_iterations=max_iterations
         or int(configured("POP_AGENT_MAX_ITERATIONS", "max_iterations", "3") or "3"),
