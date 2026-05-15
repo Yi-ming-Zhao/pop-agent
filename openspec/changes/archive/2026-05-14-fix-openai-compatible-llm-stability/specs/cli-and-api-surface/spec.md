@@ -14,6 +14,9 @@
 - base URL: `POP_AGENT_BASE_URL` 或 `OPENAI_BASE_URL`
 - 模型名: `POP_AGENT_MODEL` 或 `OPENAI_MODEL`
 
+运行时配置检测必须把 `OPENAI_API_KEY` 视为有效 API key 配置来源，以免 TUI 在已有
+OpenAI-compatible 配置时误判为未配置。
+
 #### 场景:从供应商根地址调用 DeepSeek
 
 - **当** 用户配置 `OPENAI_BASE_URL` 或 `POP_AGENT_BASE_URL` 为 `https://api.deepseek.com`
@@ -36,3 +39,10 @@
 - **当** 用户配置文件无法读取或解析
 - **那么** 系统必须将用户配置视为未设置
 - **并且** 显式参数和环境变量仍然必须生效
+
+#### 场景:TUI 识别 OpenAI 风格 API key
+
+- **当** 用户配置文件选择 OpenAI-compatible 后端并设置 base URL 和模型名
+- **并且** 环境变量只提供 `OPENAI_API_KEY`
+- **那么** 系统必须认为运行时配置已存在
+- **并且** 不得因为缺少 `POP_AGENT_API_KEY` 而强制打开安装向导
