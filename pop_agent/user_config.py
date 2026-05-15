@@ -137,7 +137,11 @@ def provider_config(
 
 
 def has_runtime_configuration() -> bool:
-    if os.getenv("POP_AGENT_LLM_BACKEND") or os.getenv("POP_AGENT_API_KEY"):
+    if (
+        os.getenv("POP_AGENT_LLM_BACKEND")
+        or os.getenv("POP_AGENT_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+    ):
         return True
     path = user_config_path()
     if not path.exists():
