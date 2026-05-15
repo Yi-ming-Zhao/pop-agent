@@ -17,6 +17,10 @@ For OpenAI-compatible fields, environment lookup now accepts both project-specif
 
 Project-specific variables stay first so existing deployments are not changed.
 
+Runtime configuration detection uses the same API key alias rule. This keeps the TUI
+from showing first-run setup when a user has selected an OpenAI-compatible provider in
+the config file and supplies the key through `OPENAI_API_KEY`.
+
 ## Endpoint Normalization
 
 The LLM client derives the request URL once during initialization:
