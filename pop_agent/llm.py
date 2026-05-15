@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from abc import ABC, abstractmethod
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
 from .config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient(ABC):
@@ -25,8 +29,11 @@ class LLMClient(ABC):
 class OpenAICompatibleLLM(LLMClient):
     def __init__(self, settings: Settings) -> None:
         if not settings.api_key:
-            raise ValueError("POP_AGENT_API_KEY is required for OpenAI-compatible backend")
+            raise ValueError(
+                "POP_AGENT_API_KEY or OPENAI_API_KEY is required for OpenAI-compatible backend"
+            )
         self.settings = settings
+        self.chat_completions_url = chat_completions_url(settings.base_url)
 
     async def complete(
         self,
@@ -44,7 +51,7 @@ class OpenAICompatibleLLM(LLMClient):
             "temperature": temperature,
             "stream": False,
         }
-        if "deepseek" in self.settings.base_url:
+        if "deepseek" in self.settings.base_url and self.settings.deepseek_thinking != "disabled":
             payload["thinking"] = {"type": self.settings.deepseek_thinking}
         headers = {"Authorization": f"Bearer {self.settings.api_key}"}
         last_error: Exception | None = None
@@ -52,9 +59,17 @@ class OpenAICompatibleLLM(LLMClient):
         limits = httpx.Limits(max_keepalive_connections=0)
         for attempt in range(1, self.settings.max_retries + 1):
             try:
+                logger.info(
+                    "Calling LLM: base_url=%s model=%s messages=%s attempt=%s timeout=%s",
+                    self.settings.base_url,
+                    self.settings.model,
+                    len(payload["messages"]),
+                    attempt,
+                    self.settings.request_timeout,
+                )
                 async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
                     response = await client.post(
-                        f"{self.settings.base_url}/chat/completions",
+                        self.chat_completions_url,
                         headers=headers,
                         json=payload,
                     )
@@ -62,6 +77,7 @@ class OpenAICompatibleLLM(LLMClient):
                 break
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
                 last_error = exc
+                logger.exception("LLM call failed on attempt %s", attempt)
                 if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
                     raise
                 if attempt >= self.settings.max_retries:
@@ -149,6 +165,24 @@ def make_llm(settings: Settings) -> LLMClient:
     if settings.llm_backend in {"openai", "openai-compatible"}:
         return OpenAICompatibleLLM(settings)
     raise ValueError(f"Unsupported LLM backend: {settings.llm_backend}")
+
+
+def chat_completions_url(base_url: str) -> str:
+    """Return a stable OpenAI-compatible chat completions endpoint.
+
+    Users often provide either the API root, such as https://api.deepseek.com,
+    or the OpenAI SDK-style base URL, such as https://api.openai.com/v1.
+    """
+    stripped = base_url.rstrip("/")
+    if stripped.endswith("/chat/completions"):
+        return stripped
+    split = urlsplit(stripped)
+    path = split.path.rstrip("/")
+    if path.endswith("/v1"):
+        endpoint_path = f"{path}/chat/completions"
+    else:
+        endpoint_path = f"{path}/v1/chat/completions"
+    return urlunsplit((split.scheme, split.netloc, endpoint_path, "", ""))
 
 
 def parse_json_object(text: str, fallback: dict[str, Any]) -> dict[str, Any]:

@@ -154,7 +154,11 @@ def generate(
         llm_backend=backend,
     )
     settings = load_settings(data_dir=data_dir, llm_backend=backend, max_iterations=max_iterations)
-    result = asyncio.run(GenerationService(settings).generate(request))
+
+    def show_progress(stage: str, message: str) -> None:
+        console.print(f"[dim]{stage}[/dim] {message}")
+
+    result = asyncio.run(GenerationService(settings).generate(request, progress=show_progress))
     console.print(f"[bold green]Generated[/bold green] {result.run_id}")
     console.print(f"Article: {result.artifacts[0].path}")
     console.print(f"Run dir: {result.run_dir}")
