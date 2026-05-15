@@ -1,6 +1,7 @@
 # Tasks
 
 - [x] Add OpenAI-compatible environment aliases for API key, base URL, and model.
+- [x] Make runtime configuration detection recognize `OPENAI_API_KEY`.
 - [x] Normalize OpenAI-compatible chat completions URL construction.
 - [x] Omit DeepSeek `thinking` payload unless explicitly enabled.
 - [x] Add sanitized LLM call logging and exception logging.
