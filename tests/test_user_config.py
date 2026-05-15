@@ -5,6 +5,7 @@ from pop_agent.config import load_settings
 from pop_agent.user_config import (
     UserConfig,
     format_user_config,
+    has_runtime_configuration,
     load_user_config,
     save_user_config,
 )
@@ -71,3 +72,21 @@ def test_load_settings_accepts_openai_compatible_env_aliases(tmp_path, monkeypat
     assert settings.api_key == "from-openai-env"
     assert settings.base_url == "https://api.deepseek.com"
     assert settings.model == "deepseek-chat"
+
+
+def test_runtime_configuration_accepts_openai_api_key_alias(tmp_path, monkeypatch):
+    monkeypatch.setenv("POP_AGENT_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.delenv("POP_AGENT_LLM_BACKEND", raising=False)
+    monkeypatch.delenv("POP_AGENT_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "from-openai-env")
+
+    save_user_config(
+        UserConfig(
+            provider="openai",
+            llm_backend="openai-compatible",
+            base_url="https://api.openai.com/v1",
+            model="gpt-4o-mini",
+        )
+    )
+
+    assert has_runtime_configuration()
