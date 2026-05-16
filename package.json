@@ -13,6 +13,8 @@
     "install:python": "python3 bootstrap.py install",
     "build": "python3 bootstrap.py build",
     "ui:build": "python3 bootstrap.py ui-build",
+    "web:build": "node web/scripts/build.mjs",
+    "web:dev": "node web/scripts/dev.mjs",
     "doctor": "python3 bootstrap.py doctor",
     "onboard": "python3 -m pop_agent onboard",
     "tui": "python3 -m pop_agent tui",

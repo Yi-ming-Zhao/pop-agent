@@ -80,7 +80,7 @@ def print_help() -> None:
                 "  install       Alias for install-deps.",
                 "  install-deps  Install project dependencies with pip install -e '.[dev]'.",
                 "  build         Compile Python sources to catch syntax/import-time issues.",
-                "  ui-build      Validate Textual TUI imports and app construction.",
+                "  ui-build      Validate Textual TUI imports and build Web frontend assets.",
                 "  link          Install this checkout as an editable global command.",
                 "  onboard       Install missing dependencies if needed, then run pop-agent onboard.",
                 "  tui           Install missing dependencies if needed, then start pop-agent tui.",
@@ -140,7 +140,31 @@ def ui_build() -> int:
     )
     command = [sys.executable, "-c", code]
     print("Running:", " ".join(command))
-    return subprocess.run(command, cwd=ROOT).returncode
+    result = subprocess.run(command, cwd=ROOT)
+    if result.returncode != 0:
+        return result.returncode
+    return build_web_assets()
+
+
+def build_web_assets() -> int:
+    web_root = ROOT / "web"
+    src_dir = web_root / "src"
+    dist_dir = web_root / "dist"
+    required = ("index.html", "styles.css", "app.js")
+
+    missing = [name for name in required if not (src_dir / name).exists()]
+    if missing:
+        print("ERROR: missing Web frontend assets:", ", ".join(missing))
+        return 1
+
+    if dist_dir.exists():
+        shutil.rmtree(dist_dir)
+    dist_dir.mkdir(parents=True, exist_ok=True)
+    for name in required:
+        shutil.copy2(src_dir / name, dist_dir / name)
+
+    print(f"Built Web frontend: {dist_dir / 'index.html'}")
+    return 0
 
 
 def link(*, include_dev: bool) -> int:
