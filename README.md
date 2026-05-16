@@ -218,6 +218,29 @@ uvicorn pop_agent.api:app --reload
 主要接口：
 
 - `POST /api/generate`
+
+## Web v1 frontend
+
+Web v1 lives in `web/src/` and follows the Claude Design handoff at
+`D:\bit\2_2\pop-agent file\design_handoff_pop_agent`. It is a zero-dependency
+static frontend for the first implementation pass, with mock data shaped like
+the future API contracts.
+
+Build the TUI and Web assets together:
+
+```bash
+python3 bootstrap.py ui-build
+```
+
+The built static files are written to `web/dist/`. For local preview during
+frontend work, run:
+
+```bash
+pnpm web:dev
+```
+
+Then open `http://127.0.0.1:5174/`. The Web app does not require an API key in
+mock mode.
 - `GET /api/runs/{run_id}`
 - `GET /api/users/{user_id}/memory`
 - `GET /api/users/{user_id}/memory?q=<query>`

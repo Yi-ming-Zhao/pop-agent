@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -234,9 +235,18 @@ def handle_run(args_text: str) -> CommandResult:
 
 def split_args(args_text: str) -> list[str]:
     try:
-        return shlex.split(args_text)
+        tokens = shlex.split(args_text, posix=os.name != "nt")
     except ValueError as exc:
         raise SlashCommandError(str(exc)) from exc
+    if os.name == "nt":
+        return [strip_matching_quotes(token) for token in tokens]
+    return tokens
+
+
+def strip_matching_quotes(token: str) -> str:
+    if len(token) >= 2 and token[0] == token[-1] and token[0] in {"'", '"'}:
+        return token[1:-1]
+    return token
 
 
 def dispatch_slash_command_sync(raw: str) -> CommandResult:
